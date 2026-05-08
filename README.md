@@ -17,9 +17,8 @@ Automated detection of stopover sites used by ospreys (_Pandion haliaetus_) duri
 **Tracking records:** 86,383 Argos Doppler-shift location fixes across 131 deployments  
 **Files:**
 
-- `01/Osprey in North and South America 1995-2002 (Martell).csv` — raw tracking data (19 MB, 47 columns)
-- `01/Osprey in North and South America 1995-2002 (Martell)-reference-data.csv` — deployment metadata (131 records)
-- `osprey_combined.csv` — merged dataset with bird identifiers (44,996 records)
+- `Osprey in North and South America 1995-2002 (Martell).csv` — raw tracking data (19 MB, 47 columns)
+- `Osprey in North and South America 1995-2002 (Martell)-reference-data.csv` — deployment metadata (131 records)
 
 ### Data Caveats
 
