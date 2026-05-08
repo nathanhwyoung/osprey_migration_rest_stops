@@ -30,11 +30,7 @@ Automated detection of stopover sites used by ospreys (_Pandion haliaetus_) duri
 
 ## Methods
 
-### 1. Data Merging (`combine_osprey_data.py`)
-
-Merges the tracking CSV with reference metadata. Assigns a pseudonymous human name to each deployment (seeded randomly for reproducibility) so outputs are readable without exposing original animal IDs.
-
-### 2. Stopover Detection
+### Stopover Detection
 
 **Pipeline steps:**
 
