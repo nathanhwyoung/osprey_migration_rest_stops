@@ -77,7 +77,7 @@ pip install pandas numpy scikit-learn
 
 # Run stopover detection
 
-python detect_stopovers_v3.py
+python detect_stopovers.py
 
 ```
 ## Citation
