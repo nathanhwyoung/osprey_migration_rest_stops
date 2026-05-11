@@ -79,8 +79,7 @@ pip install pandas numpy scikit-learn
 
 python detect_stopovers.py
 
-```
+
 ## Citation
 
 Raw data: Martell M, Douglas D. 2017. _Osprey in North and South America 1995–2002_. Movebank Data Repository.
-```
