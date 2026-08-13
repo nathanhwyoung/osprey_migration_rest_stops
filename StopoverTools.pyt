@@ -7,6 +7,7 @@ ArcGIS Pro Python toolbox for detecting migration stopover sites from point-trac
 """
 
 import arcpy
+import pandas as pd
 
 class Toolbox(object):
     def __init__(self):
@@ -283,25 +284,70 @@ class DetectStopovers(object):
     def execute(self, parameters, messages):
         p = self._params_by_name(parameters)
 
-        arcpy.AddMessage("Input         : {}".format(p["in_points"].valueAsText))
-        arcpy.AddMessage("ID Field      : {}".format(p["id_field"].valueAsText))
-        arcpy.AddMessage("Time field    : {}".format(p["time_field"].valueAsText))
-        arcpy.AddMessage("Where         : {}".format(p["where_clause"].valueAsText))
-        arcpy.AddMessage("Origin        : {}".format(p["origin_method"].valueAsText))
-        arcpy.AddMessage("Radius        : {}".format(p["cluster_radius"].valueAsText))
-        arcpy.AddMessage("Radius km     : {}".format(self._to_km(p["cluster_radius"])))
-        arcpy.AddMessage("Output        : {}".format(p["out_stopovers"].valueAsText))
+        df = self._read_points(
+            p["in_points"].valueAsText,
+            p["id_field"].valueAsText,
+            p["time_field"].valueAsText,
+            p["where_clause"].valueAsText,
+        )
 
-        window = p["window_days"].value
-        max_days = p["max_stopover_days"].value
-        arcpy.AddMessage("Window        : {} days, {}".format(window, type(window)))
-        arcpy.AddMessage("Window x2     : {}".format(window * 2))
-        arcpy.AddMessage("Max days      : {} ({})".format(max_days, type(max_days)))
+        arcpy.AddMessage("Fixes read         : {:,}".format(len(df)))
+        arcpy.AddMessage("Individuals       : {:,}".format(df["id"].nunique()))
+        arcpy.AddMessage("Date range        : {} to {}".format(
+            df["timestamp"].min(), df["timestamp"].max()
+        ))
+        arcpy.AddMessage("Lat range         : {:.4f} to {:.4f}".format(
+            df["lat"].min(), df["lat"].max()
+        ))
+        arcpy.AddMessage("Lon range         : {:.4f} to {:.4f}".format(
+            df["lon"].min(), df["lon"].max()
+        ))
 
     # HELPERS
     @staticmethod
     def _params_by_name(parameters):
         return {p.name: p for p in parameters}
+
+    @staticmethod
+    def _read_points(fc, id_field, time_field, where_clause):
+        """
+        read a point feature class into a DF with columns oid, id, timestamp, lat, lon.
+        coords are always WGS84 decimal degrees regardless of the input's projection.
+        """
+        sr = arcpy.SpatialReference(4326)
+        fields = ["OID@", id_field, time_field, "SHAPE@XY"]
+
+        rows = []
+        n_null = 0
+
+        with arcpy.da.SearchCursor(
+            fc,
+            fields,
+            where_clause=where_clause,
+            spatial_reference = sr,
+        ) as cursor:
+            for oid, ind_id, ts, xy in cursor:
+                if ind_id is None or ts is None or xy is None:
+                    n_null += 1
+                    continue
+                x, y = xy
+                rows.append((oid, ind_id, ts, y, x))
+
+        df = pd.DataFrame(
+            rows, columns=["oid", "id", "timestamp", "lat", "lon"]
+        )
+
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df = df.sort_values(["id", "timestamp"]).reset_index(drop=True)
+
+        df["id"] = df["id"].astype(str)
+
+        if n_null:
+            arcpy.AddWarning(
+                "Skipped {:,} features with a null ID, timestamp, or geometry.".format(n_null)
+            )
+
+        return df
     
     @classmethod
     def _to_km(cls, param):
