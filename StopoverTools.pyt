@@ -6,8 +6,21 @@ StopoverTools.pyt
 ArcGIS Pro Python toolbox for detecting migration stopover sites from point-track telemetry data
 """
 
+import importlib
+import os
+import sys
+
 import arcpy
 import pandas as pd
+
+# a pyt file does not reliably get is own folder on sys.path
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+import stopover_core
+
+importlib.reload(stopover_core)
 
 class Toolbox(object):
     def __init__(self):
@@ -284,24 +297,52 @@ class DetectStopovers(object):
     def execute(self, parameters, messages):
         p = self._params_by_name(parameters)
 
+        use_fields = p["origin_method"].valueAsText == "Use origin fields on input"
+
+        extra = {}
+        if use_fields:
+            extra = {
+                "origin_lat": p["origin_lat_field"].valueAsText,
+                "origin_lon": p["origin_lon_field"].valueAsText, 
+            }
+
         df = self._read_points(
             p["in_points"].valueAsText,
             p["id_field"].valueAsText,
             p["time_field"].valueAsText,
             p["where_clause"].valueAsText,
+            extra_fields=extra,
+        )
+        arcpy.AddMessage("Fixes Read                    : {:,}".format(len(df)))
+        arcpy.AddMessage("Individuals                   : {:,}".format(df["id"].nunique()))
+
+        candidates, info = stopover_core.find_candidate_fixes(
+            df,
+            origin_mode="fields" if use_fields else "first_fixes",
+            origin_days=p["origin_days"].value or 7,
+            season_start_month=p["season_start_month"].value,
+            season_end_month=p["season_end_month"].value,
+            window_days=p["window_days"].value,
+            flat_threshold_km=self._to_km(p["flat_threshold"]),
+            min_stopover_days=p["min_stopover_days"].value,
+            min_departure_km=self._to_km(p["min_departure"]),
         )
 
-        arcpy.AddMessage("Fixes read         : {:,}".format(len(df)))
-        arcpy.AddMessage("Individuals       : {:,}".format(df["id"].nunique()))
-        arcpy.AddMessage("Date range        : {} to {}".format(
-            df["timestamp"].min(), df["timestamp"].max()
-        ))
-        arcpy.AddMessage("Lat range         : {:.4f} to {:.4f}".format(
-            df["lat"].min(), df["lat"].max()
-        ))
-        arcpy.AddMessage("Lon range         : {:.4f} to {:.4f}".format(
-            df["lon"].min(), df["lon"].max()
-        ))
+        missing = info["individuals_without_origin"]
+        if missing:
+            arcpy.AddWarning(
+                "{} individual(s) had no usable origin and were dropped "
+                "({:,} fixes): {}{}".format(
+                    len(missing),
+                    info["fixes_dropped_no_origin"],
+                    ", ".join(missing[:5]),
+                    ", ..." if len(missing) > 5 else "",
+                )
+            )
+            
+            arcpy.AddMessage("After season filter       : {:,}".format(info["fixes_after_season"]))
+            arcpy.AddMessage("Candidate fixes           : {:,}".format(info["candidate_fixes"]))
+            arcpy.AddMessage("Individuals w/ candidate  : {:,}".format(info["individuals_with_candidates"]))
 
     # HELPERS
     @staticmethod
@@ -309,13 +350,18 @@ class DetectStopovers(object):
         return {p.name: p for p in parameters}
 
     @staticmethod
-    def _read_points(fc, id_field, time_field, where_clause):
+    def _read_points(fc, id_field, time_field, where_clause, extra_fields=None):
         """
         read a point feature class into a DF with columns oid, id, timestamp, lat, lon.
         coords are always WGS84 decimal degrees regardless of the input's projection.
         """
+        extra_fields = extra_fields or {}
+        extra_names = list(extra_fields.keys())
+
         sr = arcpy.SpatialReference(4326)
-        fields = ["OID@", id_field, time_field, "SHAPE@XY"]
+        fields = ["OID@", id_field, time_field, "SHAPE@XY"] + [
+            extra_fields[name] for name in extra_names
+        ]
 
         rows = []
         n_null = 0
@@ -324,22 +370,24 @@ class DetectStopovers(object):
             fc,
             fields,
             where_clause=where_clause,
-            spatial_reference = sr,
+            spatial_reference=sr,
         ) as cursor:
-            for oid, ind_id, ts, xy in cursor:
-                if ind_id is None or ts is None or xy is None:
-                    n_null += 1
+            for row in cursor:
+                oid, ind_id, ts, xy = row[:4]
+                if ind_id is None or ts is None or xy is None or xy[0] is None:
+                    n_null +=1
                     continue
                 x, y = xy
-                rows.append((oid, ind_id, ts, y, x))
+                rows.append((oid, ind_id, ts, y, x) + tuple(row[:4]))
 
         df = pd.DataFrame(
-            rows, columns=["oid", "id", "timestamp", "lat", "lon"]
+            rows,
+            columns=["oid", "id", "timestamp", "lat", "lon"] + extra_names
         )
 
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df = df.sort_values(["id", "timestamp"]).reset_index(drop=True)
 
+        df = df.sort_values(["id", "timestamp"]).reset_index(drop=True)
         df["id"] = df["id"].astype(str)
 
         if n_null:
@@ -348,7 +396,7 @@ class DetectStopovers(object):
             )
 
         return df
-    
+
     @classmethod
     def _to_km(cls, param):
         text = param.valueAsText
