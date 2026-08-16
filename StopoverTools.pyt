@@ -291,7 +291,7 @@ class DetectStopovers(object):
     def updateParameters(self, parameters):
         return
 
-    def updateMessage(self, parameters):
+    def updateMessages(self, parameters):
         return
 
     def execute(self, parameters, messages):
@@ -340,9 +340,9 @@ class DetectStopovers(object):
                 )
             )
             
-            arcpy.AddMessage("After season filter       : {:,}".format(info["fixes_after_season"]))
-            arcpy.AddMessage("Candidate fixes           : {:,}".format(info["candidate_fixes"]))
-            arcpy.AddMessage("Individuals w/ candidate  : {:,}".format(info["individuals_with_candidates"]))
+        arcpy.AddMessage("After season filter       : {:,}".format(info["fixes_after_season"]))
+        arcpy.AddMessage("Candidate fixes           : {:,}".format(info["candidate_fixes"]))
+        arcpy.AddMessage("Individuals w/ candidate  : {:,}".format(info["individuals_with_candidates"]))
 
     # HELPERS
     @staticmethod
@@ -378,11 +378,11 @@ class DetectStopovers(object):
                     n_null +=1
                     continue
                 x, y = xy
-                rows.append((oid, ind_id, ts, y, x) + tuple(row[:4]))
+                rows.append((oid, ind_id, ts, y, x) + tuple(row[4:]))
 
         df = pd.DataFrame(
             rows,
-            columns=["oid", "id", "timestamp", "lat", "lon"] + extra_names
+            columns=["oid", "id", "timestamp", "lat", "lon"] + extra_names,
         )
 
         df["timestamp"] = pd.to_datetime(df["timestamp"])

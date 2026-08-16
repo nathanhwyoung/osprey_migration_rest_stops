@@ -70,9 +70,11 @@ def flag_flat_segments(dates, displacement_km, window_days, flat_threshold_km, m
     """
     n = len(dates)
 
+    displacement_km = np.asarray(displacement_km)
+
     if displacement_km.shape != (n,):
         raise ValueError(
-            "displacement km must be a 1-D array parallel to dates:"
+            "displacement km must be a 1-D array parallel to dates: "
             "got shape {} for {} dates.".format(displacement_km.shape, n)
         )
     flags = np.zeros(n, dtype=bool)
@@ -156,7 +158,7 @@ def find_candidate_fixes(
     if not pieces:
         empty = df.copy()
         empty["displacement_km"] = pd.Series(dtype=float)
-        empty["is_candidate"] = pd.Series(dtype=float)
+        empty["is_candidate"] = pd.Series(dtype=bool)
         info["candidate_fixes"] = 0
         info["individuals_with_candidates"] = 0
         return empty, info
