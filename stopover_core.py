@@ -239,7 +239,11 @@ def summarize_clusters(clustered):
             "mean_displacement_km": round(grp["displacement_km"].mean(), 1),
         })
 
-        return pd.DataFrame(records, columns=cols)
+    return pd.DataFrame(records, columns=cols)
+
+
+# def filter_clusters(stopovers, max_stopover_days, min_cluster_displacement_km):
+
 
 
 

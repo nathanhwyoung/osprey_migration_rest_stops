@@ -58,6 +58,10 @@ def main():
     for k, v in info.items():
         print("{:30s}: {}".format(k, v))
 
+    clustered = core.cluster_candidates(candidates, cluster_radius_km=75, min_cluster_fixes=3)
+    stopovers = core.summarize_clusters(clustered)
+    print("{:30s}: {}".format("clusters summarized", len(stopovers)))
+
     ok = (
         info["candidate_fixes"] == 10145 and info["individuals_with_candidates"] == 89
     )
