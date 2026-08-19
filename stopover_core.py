@@ -115,7 +115,7 @@ def find_candidate_fixes(
 ):
     """
     resolve origins, filter to season, compute displacement from origin, flag plateaus
-    returns (candidates_df, info) -->> info is a dict of counts for report
+    returns (candidates, scored, info) -->> info is a dict of counts for report
     """
     info = {"fixes_in": len(df), "individuals_in": df["id"].nunique()}
 
@@ -208,6 +208,39 @@ def cluster_candidates(candidates, cluster_radius_km, min_cluster_fixes):
         return empty
 
     return pd.concat(pieces, ignore_index=True)
+
+def summarize_clusters(clustered):
+    """
+    one row per cluster summarizing centroid, dates, fix count, and mean NSD
+    """
+
+    cols = [
+        "id", "stopover_id", "lat", "lon", "date_first", "date_last",
+        "duration_days", "n_fixes", "mean_displacement_km",
+        ]
+
+    # remove noise
+    clustered = clustered[clustered["cluster_id"] >= 0]
+
+    records = []
+    for (ind_id, cid), grp in clustered.groupby(["id", "cluster_id"], sort=False):
+        first = grp["timestamp"].min()
+        last = grp["timestamp"].max()
+
+        records.append({
+            "id": ind_id,
+            "stopover_id": f"{ind_id}_stop{cid}",
+            "lat": round(grp["lat"].mean(), 4),
+            "lon": round(grp["lon"].mean(), 4),
+            "date_first": first,
+            "date_last": last,
+            "duration_days": (last - first).days + 1,
+            "n_fixes": len(grp),
+            "mean_displacement_km": round(grp["displacement_km"].mean(), 1),
+        })
+
+        return pd.DataFrame(records, columns=cols)
+
 
 
 
