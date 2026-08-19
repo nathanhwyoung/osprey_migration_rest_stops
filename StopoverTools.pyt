@@ -316,7 +316,7 @@ class DetectStopovers(object):
         arcpy.AddMessage("Fixes Read                    : {:,}".format(len(df)))
         arcpy.AddMessage("Individuals                   : {:,}".format(df["id"].nunique()))
 
-        candidates, info = stopover_core.find_candidate_fixes(
+        candidates, scored, info = stopover_core.find_candidate_fixes(
             df,
             origin_mode="fields" if use_fields else "first_fixes",
             origin_days=p["origin_days"].value or 7,

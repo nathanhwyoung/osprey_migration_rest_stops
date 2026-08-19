@@ -43,7 +43,7 @@ def build_input():
 
 def main():
     df = build_input()
-    candidates, info = core.find_candidate_fixes(
+    candidates, scored, info = core.find_candidate_fixes(
         df,
         origin_mode="fields",
         origin_days=7,

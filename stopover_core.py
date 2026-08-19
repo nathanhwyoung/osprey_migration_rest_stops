@@ -13,6 +13,7 @@ unit conversion happens in StopoverTools.pyt before it gets sent here
 
 import numpy as np
 import pandas as pd
+from sklearn.cluster import DBSCAN
 
 EARTH_RADIUS_KM = 6371.0
 
@@ -155,21 +156,58 @@ def find_candidate_fixes(
         grp["is_candidate"] = flags
         pieces.append(grp)
 
+    # guard clause in case pieces is empty, avoids panda ValueError
     if not pieces:
         empty = df.copy()
         empty["displacement_km"] = pd.Series(dtype=float)
         empty["is_candidate"] = pd.Series(dtype=bool)
         info["candidate_fixes"] = 0
         info["individuals_with_candidates"] = 0
-        return empty, info
+        return empty, empty.copy(), info
 
     scored = pd.concat(pieces, ignore_index=True)
     candidates = scored[scored["is_candidate"]].copy()
 
     info["candidate_fixes"] = len(candidates)
     info["individuals_with_candidates"] = candidates["id"].nunique()
-    return candidates, info
-    
+    return candidates, scored, info
+
+def cluster_candidates(candidates, cluster_radius_km, min_cluster_fixes):
+    """
+    assign dbscan cluster labels to fixes, per individual
+
+    returns the same rows + cluster_id and stopover_id
+    noise (-1) is kept, not filtered
+    """
+
+    pieces = []
+    for ind_id, grp in candidates.groupby("id", sort=False):
+
+        grp = grp.copy()
+
+        coords_rad = np.radians(grp[["lat", "lon"]].values)
+        eps_rad = cluster_radius_km / EARTH_RADIUS_KM
+
+        labels = DBSCAN(
+            eps=eps_rad,
+            min_samples=min_cluster_fixes,
+            algorithm="ball_tree",
+            metric="haversine",
+        ).fit(coords_rad).labels_
+
+        grp["cluster_id"] = labels
+        grp["stopover_id"] = [f"{ind_id}_stop{cid}" if cid >= 0 else "" for cid in labels]
+
+        pieces.append(grp)  
+
+    # again, guard clause
+    if not pieces:
+        empty = candidates.copy()
+        empty["cluster_id"] = pd.Series(dtype=int)
+        empty["stopover_id"] = pd.Series(dtype=str)
+        return empty
+
+    return pd.concat(pieces, ignore_index=True)
 
 
 
