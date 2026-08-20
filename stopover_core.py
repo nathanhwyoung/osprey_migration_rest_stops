@@ -272,6 +272,38 @@ def filter_clusters(stopovers, max_stopover_days, min_cluster_displacement_km):
     info["clusters_out"] = len(stopovers)
     return stopovers, info
 
+def find_shared_sites(stopovers, shared_radius_km):
+    """
+    for each stopover, find other stopovers within shared_radius_km
+    same animal pairs are skipped
+    """
+
+    df = stopovers.copy()
+    n = len(df)
+    lats = df["lat"].values
+    lons = df["lon"].values
+    ids = df["id"].values
+
+    # separate list for each row
+    shared_with = [[] for _ in range(n)]
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if ids[i] == ids[j]:
+                continue
+            dist = haversine(lats[i], lons[i], lats[j], lons[j])
+            if dist <= shared_radius_km:
+                shared_with[i].append(ids[j])
+                shared_with[j].append(ids[i])
+
+    df["shared_with"] = [";".join(sorted(set(s))) for s in shared_with]
+    df["n_birds_total"] = [len(set(s)) + 1 for s in shared_with]
+
+    return df
+
+    
+
+
 
 
 

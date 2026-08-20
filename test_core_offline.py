@@ -66,6 +66,20 @@ def main():
     for k, v in finfo.items():
         print("{:30s}: {}".format(k, v))
 
+    shared = core.find_shared_sites(filtered, shared_radius_km=50)
+
+    results = [
+        ("stopovers",           len(shared),                            82),
+        ("individuals",         shared["id"].nunique(),                 60),
+        ("shared sites",        (shared["shared_with"] != "").sum(),    26),
+        ("max birds at site",   shared["n_birds_total"].max(),          5),
+    ]
+
+    print()
+    for name, got, want in results:
+        status = "MATCH" if got == want else "*** MISMATCH ***"
+        print("{:20s}: {:>6}  (want {:>4})  {}".format(name, got, want, status))
+
     ok = (
         info["candidate_fixes"] == 10145 and info["individuals_with_candidates"] == 89
     )
