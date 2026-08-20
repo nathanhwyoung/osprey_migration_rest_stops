@@ -165,6 +165,7 @@ def find_candidate_fixes(
         info["individuals_with_candidates"] = 0
         return empty, empty.copy(), info
 
+    # scored exists to answer "which stage dropped what data"
     scored = pd.concat(pieces, ignore_index=True)
     candidates = scored[scored["is_candidate"]].copy()
 
@@ -241,7 +242,6 @@ def summarize_clusters(clustered):
 
     return pd.DataFrame(records, columns=cols)
 
-
 def filter_clusters(stopovers, max_stopover_days, min_cluster_displacement_km):
     """
     filters both pre-departure and wintering sites
@@ -300,6 +300,57 @@ def find_shared_sites(stopovers, shared_radius_km):
     df["n_birds_total"] = [len(set(s)) + 1 for s in shared_with]
 
     return df
+
+def build_stopovers(candidates, cluster_radius_km, min_cluster_fixes, max_stopover_days, min_cluster_displacement_km, shared_radius_km):
+    """
+    stages 1-4, in order
+    merge counts
+    returns (stopovers, clustered, info)
+    """
+
+    # STAGE 1, fix level
+    clustered = cluster_candidates(candidates, cluster_radius_km, min_cluster_fixes)
+
+    # STAGE 2, site level
+    summarized = summarize_clusters(clustered)
+
+    # STAGE 3, returns tuple
+    filtered, filter_info = filter_clusters(summarized, max_stopover_days, min_cluster_displacement_km)
+
+    # STAGE 4, must run after filters
+    stopovers = find_shared_sites(filtered, shared_radius_km)
+
+    n_out = len(stopovers)
+
+    info = {
+        "clusters_found": filter_info["clusters_in"],
+        "noise_fixes": int((clustered["cluster_id"] == -1).sum()),
+        "clusters_dropped_duration": filter_info["clusters_dropped_duration"],
+        "clusters_dropped_displacement": filter_info["clusters_dropped_displacement"],
+        "stopovers_final": n_out,
+        "individuals_with_stopovers": int(stopovers["id"].nunique()) if n_out else 0,
+        "shared_sites": int((stopovers["n_birds_total"] > 1).sum()) if n_out else 0,
+        "max_individuals_at_one_site": int(stopovers["n_birds_total"].max()) if n_out else 0,
+    }
+
+    return stopovers, clustered, info
+
+def attach_cluster_labels(scored, clustered):
+    """
+    put ids back onto fixes
+    non-candidates get -1 and "", same as noise
+    """
+
+    labels = clustered[["oid", "cluster_id", "stopover_id"]]
+
+    out = scored.merge(labels, on="oid", how="left")
+
+    out["cluster_id"] = out["cluster_id"].fillna(-1).astype(int)
+    out["stopover_id"] = out["stopover_id"].fillna("")
+
+    return out
+
+
 
     
 
