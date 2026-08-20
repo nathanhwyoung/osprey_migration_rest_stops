@@ -242,7 +242,35 @@ def summarize_clusters(clustered):
     return pd.DataFrame(records, columns=cols)
 
 
-# def filter_clusters(stopovers, max_stopover_days, min_cluster_displacement_km):
+def filter_clusters(stopovers, max_stopover_days, min_cluster_displacement_km):
+    """
+    filters both pre-departure and wintering sites
+    either threshold can be None, in which case the filter is off
+    returns filtered_df, info
+    """
+
+    info = {"clusters_in": len(stopovers)}
+
+    # duration filter first
+    if max_stopover_days is None:
+        info["clusters_dropped_duration"] = 0
+    else:
+        n_before = len(stopovers)
+        stopovers = stopovers[stopovers["duration_days"] <= max_stopover_days]
+        info["clusters_dropped_duration"] = n_before - len(stopovers)
+
+    # displacement filter second
+    if min_cluster_displacement_km is None:
+        info["clusters_dropped_displacement"] = 0
+    else:
+        n_before = len(stopovers)
+        stopovers = stopovers[
+            stopovers["mean_displacement_km"] >= min_cluster_displacement_km
+        ]
+        info["clusters_dropped_displacement"] = n_before - len(stopovers)
+
+    info["clusters_out"] = len(stopovers)
+    return stopovers, info
 
 
 

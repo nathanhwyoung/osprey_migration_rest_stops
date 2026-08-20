@@ -62,6 +62,10 @@ def main():
     stopovers = core.summarize_clusters(clustered)
     print("{:30s}: {}".format("clusters summarized", len(stopovers)))
 
+    filtered, finfo = core.filter_clusters(stopovers, max_stopover_days=45, min_cluster_displacement_km=250)
+    for k, v in finfo.items():
+        print("{:30s}: {}".format(k, v))
+
     ok = (
         info["candidate_fixes"] == 10145 and info["individuals_with_candidates"] == 89
     )
